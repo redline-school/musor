@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Карточки слов</title>
+<style>
+:root {
+  --bg1:#111827; --bg2:#1f2937; --card:#ffffff; --text:#111827;
+  --muted:#6b7280; --red:#ef4444; --green:#22c55e; --blue:#3b82f6; --yellow:#f59e0b;
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  background: radial-gradient(circle at top, #374151, var(--bg1) 55%, #030712);
+  color:white; display:flex; justify-content:center; align-items:center; padding:16px;
+}
+.app { width:100%; max-width:520px; }
+.top {
+  display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;
+}
+h1 { font-size:23px; margin:0; letter-spacing:-.5px; }
+.small { color:#d1d5db; font-size:13px; }
+.pill {
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.16);
+  border-radius:999px; padding:8px 11px; font-size:13px;
+}
+.stats {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0;
+}
+.stat {
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15);
+  border-radius:16px; padding:10px 6px; text-align:center;
+}
+.stat b { display:block; font-size:18px; }
+.stat span { color:#d1d5db; font-size:11px; }
+.progress {
+  height:10px; background:rgba(255,255,255,.12); border-radius:99px; overflow:hidden; margin:12px 0;
+}
+.bar { height:100%; width:0%; background:linear-gradient(90deg,var(--green),#84cc16); transition:.25s; }
+.cardWrap { perspective:1000px; margin-top:14px; }
+.card {
+  width:100%; min-height:285px; position:relative; transform-style:preserve-3d;
+  transition:transform .45s ease; cursor:pointer;
+}
+.card.flipped { transform:rotateY(180deg); }
+.face {
+  position:absolute; inset:0; background:var(--card); color:var(--text);
+  border-radius:28px; padding:26px; backface-visibility:hidden;
+  display:flex; flex-direction:column; justify-content:center; align-items:center;
+  text-align:center; box-shadow:0 22px 60px rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.4);
+}
+.front .label { color:var(--muted); font-size:13px; margin-bottom:14px; text-transform:uppercase; letter-spacing:.12em; }
+.word { font-size:34px; font-weight:900; line-height:1.08; }
+.back { transform:rotateY(180deg); }
+.def { font-size:23px; line-height:1.25; font-weight:700; }
+.hint { margin-top:16px; font-size:13px; color:var(--muted); }
+.controls { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+button {
+  border:0; border-radius:18px; padding:15px 12px; font-size:16px; font-weight:800;
+  color:white; box-shadow:0 10px 24px rgba(0,0,0,.22);
+}
+.btnFull { grid-column:1/3; background:var(--blue); }
+.bad { background:var(--red); }
+.good { background:var(--green); }
+.secondary { background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.15); }
+.yellow { background:var(--yellow); }
+.modeRow { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
+.modeRow button { padding:11px 8px; font-size:13px; border-radius:14px; }
+.active { outline:3px solid rgba(255,255,255,.7); }
+.footerBtns { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.listBox {
+  display:none; margin-top:12px; max-height:230px; overflow:auto; background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.15); border-radius:18px; padding:10px;
+}
+.item { padding:10px; border-bottom:1px solid rgba(255,255,255,.1); font-size:14px; }
+.item:last-child { border-bottom:0; }
+kbd { background:#111827; color:white; border-radius:8px; padding:2px 6px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div>
+      <h1>Карточки слов</h1>
+      <div class="small">Нажми на карточку, чтобы перевернуть</div>
+    </div>
+    <div class="pill" id="modeName">Слово → значение</div>
+  </div>
+
+  <div class="modeRow">
+    <button class="secondary active" id="modeWord" onclick="setMode('word')">Слово → значение</button>
+    <button class="secondary" id="modeDef" onclick="setMode('def')">Значение → слово</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="left">0</b><span>осталось</span></div>
+    <div class="stat"><b id="good">0</b><span>знал</span></div>
+    <div class="stat"><b id="bad">0</b><span>ошибки</span></div>
+    <div class="stat"><b id="fav">0</b><span>сложные</span></div>
+  </div>
+  <div class="progress"><div class="bar" id="bar"></div></div>
+
+  <div class="cardWrap">
+    <div class="card" id="card" onclick="flipCard()">
+      <div class="face front">
+        <div class="label" id="frontLabel">Вспомни значение</div>
+        <div class="word" id="frontText"></div>
+        <div class="hint">тапни, чтобы увидеть ответ</div>
+      </div>
+      <div class="face back">
+        <div class="def" id="backText"></div>
+        <div class="hint">оцени честно: знал или нет</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="bad" onclick="mark(false)">Не знал</button>
+    <button class="good" onclick="mark(true)">Знал</button>
+    <button class="btnFull yellow" onclick="toggleHard()">★ Добавить в сложные</button>
+  </div>
+
+  <div class="footerBtns">
+    <button class="secondary" onclick="repeatMistakes()">Повторить ошибки</button>
+    <button class="secondary" onclick="restart()">Заново</button>
+    <button class="secondary" onclick="repeatHard()">Сложные слова</button>
+    <button class="secondary" onclick="toggleList()">Список ошибок</button>
+  </div>
+
+  <div class="listBox" id="listBox"></div>
+</div>
+
+<script>
+const allCards = [{"word": "АБСУРД", "def": "бессмыслица"}, {"word": "АДАПТИРОВАТЬ", "def": "упростить текст для мало подготовленных читателей"}, {"word": "АЛЬТЕРНАТИВА", "def": "необходимость выбора одной из двух и более взаимоисключающих возможностей"}, {"word": "АЛЬТРУИЗМ", "def": "бескорыстное стремление помогать другим"}, {"word": "АЛЬЯНС", "def": "союз, объединение на основе договорных обязательств"}, {"word": "АМБИЦИЯ", "def": "обостренное самолюбие"}, {"word": "АННАЛЫ", "def": "сжатая хроника"}, {"word": "АНОМАЛИЯ", "def": "отклонение от нормы"}, {"word": "АСПЕКТ", "def": "точка зрения, взгляд на что-нибудь"}, {"word": "АУДИТ", "def": "независимая экспертиза финансовой отчетности предприятия"}, {"word": "БАЛЛОТИРОВАТЬСЯ", "def": "выставлять свою кандидатуру для голосования"}, {"word": "БЕЛЛЕТРИСТИКА", "def": "художественная проза, произведение для лёгкого развлекательного чтения"}, {"word": "БЕСПРЕЦЕДЕНТНЫЙ", "def": "не имеющий аналогии в прошлом"}, {"word": "БЕСТСЕЛЛЕР", "def": "очень хорошо покупаемая книга"}, {"word": "БРИФИНГ", "def": "короткая пресс-конференция"}, {"word": "ВЕТО", "def": "безусловный запрет, право одного лица блокировать постановление коллегиального органа"}, {"word": "ВИЗАВИ", "def": "друг против друга, напротив"}, {"word": "ВИЗУАЛЬНЫЙ", "def": "видимый, непосредственно воспринимаемый зрением"}, {"word": "ВИРТУАЛЬНЫЙ", "def": "реально не существующий, воображаемый"}, {"word": "ВОТУМ", "def": "решение, принятое голосованием"}, {"word": "ГЕГЕМОНИЯ", "def": "преобладание руководства, преобладающая роль"}, {"word": "ГЕНОЦИД", "def": "политика уничтожения отдельных групп населения по расовым, национальным, религиозным признакам"}, {"word": "ГРАНТ", "def": "финансирование научных исследований в виде единовременных дотаций, субсидий, стипендий на конкурсной основе"}, {"word": "ГУМАНИЗМ", "def": "человечность, любовь к людям"}, {"word": "ДЕМАГОГИЯ", "def": "обман народа с помощью пустых заверений и обещаний"}, {"word": "ДЕМАРШ", "def": "демонстративный протест в знак решительного несогласия"}, {"word": "ДЕПОРТИРОВАТЬ", "def": "изгнать из страны, выселить"}, {"word": "ДИЛЕТАНТ", "def": "непрофессионал"}, {"word": "ДИСКРЕДИТАЦИЯ", "def": "подрыв доверия к кому-либо"}, {"word": "ДИССИДЕНТ", "def": "человек, несогласный с господствующей идеологией"}, {"word": "ДИССОНАНС", "def": "отсутствие гармонии, несоответствие, противоречие чему-либо"}, {"word": "ДИСТРИБЬЮТОР", "def": "лицо или фирма, занимающиеся сбытом и гарантийным обслуживанием товара от лица изготовителя"}, {"word": "ДИФИРАМБ", "def": "преувеличенная восторженная похвала"}, {"word": "ИГНОРИРОВАТЬ", "def": "намеренно не обращать внимания"}, {"word": "ИММИГРАЦИЯ", "def": "переезд в другую страну на постоянное место жительства"}, {"word": "ИМПИЧМЕНТ", "def": "лишение полномочий высших должностных лиц в связи с грубым нарушением закона"}, {"word": "ИМПОЗАНТНЫЙ", "def": "представительный, производящий впечатление"}, {"word": "ИНАУГУРАЦИЯ", "def": "торжественная процедура вступления на должность главы государства или другого выборного лица"}, {"word": "ИНВЕКТИВА", "def": "бранное слово, ругательство"}, {"word": "ИНВЕСТИРОВАТЬ", "def": "вкладывать капитал в какую-либо отрасль экономики или предприятие"}, {"word": "ИННОВАЦИЯ", "def": "нововведение, новые технологии в какой-либо сфере"}, {"word": "ИНСИНУАЦИЯ", "def": "клевета"}, {"word": "КАРДИНАЛЬНЫЙ", "def": "самый важный, существенный"}, {"word": "КАТАКЛИЗМ", "def": "разрушительное событие, катастрофа"}, {"word": "КАТАРСИС", "def": "нравственное очищение страданием"}, {"word": "КВОРУМ", "def": "большинство собрания, необходимое для принятия решений"}, {"word": "КОМПЕТЕНЦИЯ", "def": "осведомленность в какой-либо области"}, {"word": "КОМПРОМЕТИРОВАТЬ", "def": "подрывать репутацию"}, {"word": "КОНСАЛТИНГ", "def": "консультирование производителей, продавцов и покупателей по экономическим и правовым вопросам"}, {"word": "КОНСЕНСУС", "def": "общее согласие по спорному вопросу, достигнутое в результате дискуссии"}, {"word": "КОНФЕССИЯ", "def": "вероисповедание"}, {"word": "КСЕНОФОБИЯ", "def": "нетерпимость, враждебность ко всему чужому, незнакомому, непривычному"}, {"word": "ЛАКОНИЧНЫЙ", "def": "краткий, немногословный"}, {"word": "ЛЕГИТИМНЫЙ", "def": "законный"}, {"word": "ЛЕЙТМОТИВ", "def": "основная мысль"}, {"word": "ЛОКАЛЬНЫЙ", "def": "местный"}, {"word": "ЛОЯЛЬНОСТЬ", "def": "благожелательное отношение к кому-либо или чему-либо"}, {"word": "МЕМОРАНДУМ", "def": "дипломатический документ с изложением взглядов правительства на какой-либо вопрос"}, {"word": "МЕНТАЛИТЕТ", "def": "мировосприятие, мироощущение, склад ума"}, {"word": "МЕЦЕНАТ", "def": "покровитель наук и искусства, оказывающий финансовую поддержку"}, {"word": "МИЗАНТРОП", "def": "человеконенавистник"}, {"word": "МОНИТОРИНГ", "def": "постоянное наблюдение за процессами с целью изучения или контроля"}, {"word": "НОНСЕНС", "def": "бессмыслица, нелепость"}, {"word": "ПАРАДОКС", "def": "мнение или суждение, противоречащее здравому смыслу"}, {"word": "ПАРИТЕТ", "def": "принцип равного представительства"}, {"word": "ПИЕТЕТ", "def": "глубокое уважение, почтительное отношение"}, {"word": "ПЛАГИАТ", "def": "умышленное присвоение чужого авторства"}, {"word": "ПРЕВЕНТИВНЫЙ", "def": "предупреждающий, предохранительный"}, {"word": "ПРИВАТНЫЙ", "def": "частный, неофициальный"}, {"word": "РЕНОМЕ", "def": "репутация, установившееся мнение о ком-либо или о чем-либо"}, {"word": "РЕСПЕКТАБЕЛЬНЫЙ", "def": "солидный, достойный, вызывающий доверие и уважение"}, {"word": "РЕТРОСПЕКТИВА", "def": "обращение в прошлое, обзор минувшего"}, {"word": "РИЕЛТОР", "def": "торговый посредник при продаже недвижимости"}, {"word": "САММИТ", "def": "встреча глав государств, совещание на высшем уровне"}, {"word": "ТОЛЕРАНТНЫЙ", "def": "терпимый к иным мнениям и взглядам"}, {"word": "ТОТАЛЬНЫЙ", "def": "всеобщий, всеохватывающий"}, {"word": "ТРИВИАЛЬНЫЙ", "def": "избитый, банальный, пошлый"}, {"word": "ФЕНОМЕН", "def": "редкое необычное явление или выдающийся исключительный человек"}, {"word": "ФИАСКО", "def": "неудача, провал"}, {"word": "ФИЛАНТРОПИЯ", "def": "благотворительность, человеколюбие"}, {"word": "ФРИВОЛЬНЫЙ", "def": "легкомысленный, не вполне пристойный"}, {"word": "ХАРИЗМА", "def": "одарённость, особая способность воздействовать на окружающих"}, {"word": "ЭКСКЛЮЗИВНЫЙ", "def": "исключительный, единственный в своём роде"}, {"word": "ЭКСКУРС", "def": "отступление от главной темы изложения для освещения побочного вопроса"}, {"word": "ЭКСПАНСИЯ", "def": "расширение, распространение сферы влияния за первоначальные пределы"}, {"word": "ЭЛЕКТОРАТ", "def": "круг избирателей, голосующих за кандидата или партию"}, {"word": "ЭПАТАЖ", "def": "скандальная выходка, поведение, нарушающее общепринятые нормы"}, {"word": "ЭФЕМЕРНЫЙ", "def": "мимолётный, призрачный"}];
+let deck = [];
+let current = null;
+let mode = "word";
+let good = 0;
+let bad = 0;
+let mistakes = [];
+let hard = JSON.parse(localStorage.getItem("hardWords") || "[]");
+let totalThisRound = allCards.length;
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function start(newDeck) {
+  deck = shuffle([...newDeck]);
+  totalThisRound = deck.length || allCards.length;
+  good = 0; bad = 0; mistakes = [];
+  next();
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById("modeWord").classList.toggle("active", m==="word");
+  document.getElementById("modeDef").classList.toggle("active", m==="def");
+  document.getElementById("modeName").textContent = m==="word" ? "Слово → значение" : "Значение → слово";
+  showCurrent();
+}
+
+function flipCard() {
+  document.getElementById("card").classList.toggle("flipped");
+}
+
+function showCurrent() {
+  if (!current) return;
+  document.getElementById("card").classList.remove("flipped");
+  const front = mode === "word" ? current.word : current.def;
+  const back = mode === "word" ? current.def : current.word;
+  document.getElementById("frontLabel").textContent = mode === "word" ? "Вспомни значение" : "Вспомни слово";
+  document.getElementById("frontText").textContent = front;
+  document.getElementById("backText").textContent = back;
+  document.querySelector(".yellow").textContent = isHard(current) ? "★ Убрать из сложных" : "★ Добавить в сложные";
+  updateStats();
+}
+
+function next() {
+  if (deck.length === 0) {
+    if (mistakes.length > 0 && confirm("Круг закончен. Повторить только ошибки?")) {
+      deck = shuffle([...mistakes]);
+      totalThisRound = deck.length;
+      mistakes = [];
+    } else {
+      alert("Круг закончен! Знал: " + good + ", ошибок: " + bad);
+      deck = shuffle([...allCards]);
+      totalThisRound = allCards.length;
+      good = 0; bad = 0; mistakes = [];
+    }
+  }
+  current = deck.pop();
+  showCurrent();
+}
+
+function mark(isGood) {
+  if (!current) return;
+  if (isGood) good++;
+  else {
+    bad++;
+    mistakes.push(current);
+  }
+  next();
+}
+
+function isHard(card) {
+  return hard.includes(card.word);
+}
+
+function toggleHard() {
+  if (!current) return;
+  if (isHard(current)) hard = hard.filter(w => w !== current.word);
+  else hard.push(current.word);
+  localStorage.setItem("hardWords", JSON.stringify(hard));
+  showCurrent();
+}
+
+function repeatMistakes() {
+  if (mistakes.length === 0) return alert("Ошибок пока нет");
+  deck = shuffle([...mistakes]);
+  totalThisRound = deck.length;
+  mistakes = [];
+  next();
+}
+
+function repeatHard() {
+  const hardDeck = allCards.filter(c => hard.includes(c.word));
+  if (hardDeck.length === 0) return alert("Сложных слов пока нет");
+  start(hardDeck);
+}
+
+function restart() {
+  start(allCards);
+}
+
+function toggleList() {
+  const box = document.getElementById("listBox");
+  box.style.display = box.style.display === "block" ? "none" : "block";
+  if (mistakes.length === 0) {
+    box.innerHTML = '<div class="item">Ошибок пока нет</div>';
+    return;
+  }
+  box.innerHTML = mistakes.map(c => `<div class="item"><b>${c.word}</b><br>${c.def}</div>`).join("");
+}
+
+function updateStats() {
+  document.getElementById("left").textContent = deck.length + 1;
+  document.getElementById("good").textContent = good;
+  document.getElementById("bad").textContent = bad;
+  document.getElementById("fav").textContent = hard.length;
+  const done = Math.max(0, totalThisRound - (deck.length + 1));
+  const percent = totalThisRound ? Math.round(done / totalThisRound * 100) : 0;
+  document.getElementById("bar").style.width = percent + "%";
+}
+
+start(allCards);
+</script>
+</body>
+</html>
